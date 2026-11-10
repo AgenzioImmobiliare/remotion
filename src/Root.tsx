@@ -1,4 +1,4 @@
-import { Composition } from "remotion";
+import { Composition, staticFile } from "remotion";
 import { MyComposition } from "./Composition";
 import { RealEstateReel, RealEstateReelSchema } from "./RealEstateReel";
 
@@ -15,8 +15,7 @@ export const RemotionRoot: React.FC = () => {
         height={1920}
         schema={RealEstateReelSchema}
         defaultProps={{
-          photoUrl:
-            "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1600",
+          photoUrl: staticFile("property-placeholder.jpg"),
           price: "€ 185.000",
           address: "Via Roma 12",
           comune: "Agropoli",
