@@ -15,7 +15,7 @@ export const RemotionRoot: React.FC = () => {
         height={1920}
         schema={RealEstateReelSchema}
         defaultProps={{
-          photoUrl: staticFile("property-placeholder.jpg"),
+          photoUrl: staticFile("property-real.jpg"),
           price: "€ 185.000",
           address: "Via Roma 12",
           comune: "Agropoli",
