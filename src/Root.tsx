@@ -1,6 +1,11 @@
 import { Composition, staticFile } from "remotion";
 import { MyComposition } from "./Composition";
 import { RealEstateReel, RealEstateReelSchema } from "./RealEstateReel";
+import {
+  RealEstateReelMulti,
+  RealEstateReelMultiSchema,
+  calculateRealEstateReelMultiMetadata,
+} from "./RealEstateReelMulti";
 import { Bumper, BumperSchema } from "./Bumper";
 
 const BUMPER_COMMON = {
@@ -71,6 +76,27 @@ export const RemotionRoot: React.FC = () => {
           comune: "Agropoli",
           agencyName: "Frimm Capital Casa Paestum",
           agentName: "Enzo Carnicelli",
+        }}
+      />
+      <Composition
+        id="RealEstateReelMulti"
+        component={RealEstateReelMulti}
+        fps={30}
+        width={1080}
+        height={1920}
+        schema={RealEstateReelMultiSchema}
+        calculateMetadata={calculateRealEstateReelMultiMetadata}
+        defaultProps={{
+          photos: [
+            staticFile("property-real.jpg"),
+            staticFile("property-placeholder.jpg"),
+          ],
+          price: "€ 185.000",
+          address: "Via Roma 12",
+          comune: "Agropoli",
+          agencyName: "Frimm Capital Casa Paestum",
+          agentName: "Enzo Carnicelli",
+          phone: "347 123 4567",
         }}
       />
       {BUMPERS.map((b) => (
