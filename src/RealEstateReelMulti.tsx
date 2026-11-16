@@ -29,7 +29,7 @@ const GOLD = "#D97706";
 const GOLD2 = "#B45309";
 
 export const RealEstateReelMultiSchema = z.object({
-  photos: z.array(z.string()).min(1).max(6),
+  photos: z.array(z.string()).min(1).max(10),
   address: z.string(),
   comune: z.string(),
   price: z.string(),
@@ -37,6 +37,9 @@ export const RealEstateReelMultiSchema = z.object({
   agentName: z.string(),
   phone: z.string().optional(),
   agentPhotoUrl: z.string().optional(),
+  /** PNG trasparente del logo agenzia: se presente sostituisce la scritta
+   * testuale "AgencyWordmark" in copertina/foto e nel finale. */
+  agencyLogoUrl: z.string().optional(),
 });
 
 type Props = z.infer<typeof RealEstateReelMultiSchema>;
@@ -128,12 +131,35 @@ const KenBurnsPhoto: React.FC<{
   );
 };
 
-const AgencyWordmark: React.FC<{ agencyName: string }> = ({ agencyName }) => {
+const AgencyWordmark: React.FC<{
+  agencyName: string;
+  agencyLogoUrl?: string;
+}> = ({ agencyName, agencyLogoUrl }) => {
   const frame = useCurrentFrame();
   const opacity = interpolate(frame, [0, 0.4 * FPS], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+
+  if (agencyLogoUrl) {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          top: 80,
+          left: 80,
+          opacity,
+          filter: "drop-shadow(0 2px 10px rgba(0,0,0,.45))",
+        }}
+      >
+        <CanvasImage
+          src={agencyLogoUrl}
+          style={{ height: 64, width: "auto", objectFit: "contain" }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -161,7 +187,8 @@ const CoverSlide: React.FC<{
   comune: string;
   price: string;
   agencyName: string;
-}> = ({ photoUrl, address, comune, price, agencyName }) => {
+  agencyLogoUrl?: string;
+}> = ({ photoUrl, address, comune, price, agencyName, agencyLogoUrl }) => {
   const frame = useCurrentFrame();
   const opacity = useFadeIn();
 
@@ -174,7 +201,7 @@ const CoverSlide: React.FC<{
             "linear-gradient(180deg, rgba(15,23,42,0) 32%, rgba(15,23,42,.55) 62%, rgba(15,23,42,.97) 100%)",
         }}
       />
-      <AgencyWordmark agencyName={agencyName} />
+      <AgencyWordmark agencyName={agencyName} agencyLogoUrl={agencyLogoUrl} />
       <AbsoluteFill
         style={{
           justifyContent: "flex-end",
@@ -247,7 +274,8 @@ const PhotoSlide: React.FC<{
   photoUrl: string;
   index: number;
   agencyName: string;
-}> = ({ photoUrl, index, agencyName }) => {
+  agencyLogoUrl?: string;
+}> = ({ photoUrl, index, agencyName, agencyLogoUrl }) => {
   const opacity = useFadeIn();
   return (
     <AbsoluteFill style={{ backgroundColor: NAVY, opacity }}>
@@ -262,7 +290,7 @@ const PhotoSlide: React.FC<{
             "linear-gradient(180deg, rgba(15,23,42,.45) 0%, rgba(15,23,42,0) 22%, rgba(15,23,42,0) 78%, rgba(15,23,42,.55) 100%)",
         }}
       />
-      <AgencyWordmark agencyName={agencyName} />
+      <AgencyWordmark agencyName={agencyName} agencyLogoUrl={agencyLogoUrl} />
     </AbsoluteFill>
   );
 };
@@ -272,7 +300,8 @@ const OutroSlide: React.FC<{
   agentName: string;
   phone?: string;
   agentPhotoUrl?: string;
-}> = ({ agencyName, agentName, phone, agentPhotoUrl }) => {
+  agencyLogoUrl?: string;
+}> = ({ agencyName, agentName, phone, agentPhotoUrl, agencyLogoUrl }) => {
   const frame = useCurrentFrame();
   const opacity = useFadeIn();
 
@@ -463,19 +492,32 @@ const OutroSlide: React.FC<{
           paddingBottom: 110,
         }}
       >
-        <div
-          style={{
-            fontFamily: sans,
-            fontWeight: 700,
-            fontSize: 28,
-            letterSpacing: 1,
-            color: "#fff",
-            textTransform: "uppercase",
-            opacity: badgeOpacity,
-          }}
-        >
-          {agencyName}
-        </div>
+        {agencyLogoUrl ? (
+          <CanvasImage
+            src={agencyLogoUrl}
+            style={{
+              height: 56,
+              width: "auto",
+              objectFit: "contain",
+              opacity: badgeOpacity,
+              marginBottom: 10,
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              fontFamily: sans,
+              fontWeight: 700,
+              fontSize: 28,
+              letterSpacing: 1,
+              color: "#fff",
+              textTransform: "uppercase",
+              opacity: badgeOpacity,
+            }}
+          >
+            {agencyName}
+          </div>
+        )}
         <div
           style={{
             fontFamily: sans,
@@ -502,6 +544,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
   agentName,
   phone,
   agentPhotoUrl,
+  agencyLogoUrl,
 }) => {
   const { durationInFrames } = useVideoConfig();
 
@@ -531,6 +574,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
           comune={comune}
           price={price}
           agencyName={agencyName}
+          agencyLogoUrl={agencyLogoUrl}
         />
       </Sequence>
 
@@ -541,7 +585,12 @@ export const RealEstateReelMulti: React.FC<Props> = ({
           durationInFrames={PHOTO_DURATION}
           layout="none"
         >
-          <PhotoSlide photoUrl={url} index={index} agencyName={agencyName} />
+          <PhotoSlide
+            photoUrl={url}
+            index={index}
+            agencyName={agencyName}
+            agencyLogoUrl={agencyLogoUrl}
+          />
         </Sequence>
       ))}
 
@@ -551,6 +600,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
           agentName={agentName}
           phone={phone}
           agentPhotoUrl={agentPhotoUrl}
+          agencyLogoUrl={agencyLogoUrl}
         />
       </Sequence>
 
