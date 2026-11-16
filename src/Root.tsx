@@ -7,6 +7,7 @@ import {
   calculateRealEstateReelMultiMetadata,
 } from "./RealEstateReelMulti";
 import { Bumper, BumperSchema } from "./Bumper";
+import { SchedaImmobile, SchedaImmobileSchema } from "./SchedaImmobile";
 
 const BUMPER_COMMON = {
   agencyName: "Frimm Capital Casa Paestum",
@@ -97,6 +98,24 @@ export const RemotionRoot: React.FC = () => {
           agencyName: "Frimm Capital Casa Paestum",
           agentName: "Enzo Carnicelli",
           phone: "347 123 4567",
+        }}
+      />
+      <Composition
+        id="SchedaImmobile"
+        component={SchedaImmobile}
+        durationInFrames={150}
+        fps={30}
+        width={1080}
+        height={1920}
+        schema={SchedaImmobileSchema}
+        defaultProps={{
+          comune: "Agropoli",
+          tipo: "Villa / Indipendente",
+          stato: "In vendita",
+          price: "€ 290.000",
+          mq: "200",
+          locali: "3",
+          bagni: "2",
         }}
       />
       {BUMPERS.map((b) => (
