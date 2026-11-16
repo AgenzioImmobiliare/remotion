@@ -98,6 +98,9 @@ export const RemotionRoot: React.FC = () => {
           agencyName: "Frimm Capital Casa Paestum",
           agentName: "Enzo Carnicelli",
           phone: "347 123 4567",
+          logoPosition: "top-left",
+          logoSize: 64,
+          secondsPerPhoto: 2.2,
         }}
       />
       <Composition

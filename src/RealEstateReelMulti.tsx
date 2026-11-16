@@ -52,6 +52,14 @@ export const RealEstateReelMultiSchema = z.object({
   classeEnergetica: z.string().optional(),
   /** Musica di sottofondo (loop): se omessa usa music-ambient.mp3. */
   musicUrl: z.string().optional(),
+  /** Angolo del watermark agenzia su copertina e foto (default: in alto a sinistra). */
+  logoPosition: z
+    .enum(["top-left", "top-right", "bottom-left", "bottom-right"])
+    .optional(),
+  /** Altezza in px del logo/watermark (default 64). */
+  logoSize: z.number().optional(),
+  /** Durata di ogni foto intermedia, in secondi (default 2.2s). */
+  secondsPerPhoto: z.number().optional(),
 });
 
 type Props = z.infer<typeof RealEstateReelMultiSchema>;
@@ -71,6 +79,7 @@ const END_FADE = Math.round(0.4 * FPS);
 export const durationForPhotoCount = (
   photoCount: number,
   hasScheda = false,
+  photoDuration = PHOTO_DURATION,
 ) => {
   const middleCount = Math.max(0, photoCount - 1);
   const schedaCount = hasScheda ? 1 : 0;
@@ -78,7 +87,7 @@ export const durationForPhotoCount = (
   return (
     COVER_DURATION +
     schedaCount * SCHEDA_DURATION +
-    middleCount * PHOTO_DURATION +
+    middleCount * photoDuration +
     OUTRO_DURATION -
     transitions * OVERLAP
   );
@@ -89,10 +98,14 @@ export const calculateRealEstateReelMultiMetadata = ({
 }: {
   props: Props;
 }) => {
+  const photoDuration = props.secondsPerPhoto
+    ? Math.round(props.secondsPerPhoto * FPS)
+    : PHOTO_DURATION;
   return {
     durationInFrames: durationForPhotoCount(
       props.photos.length,
       Boolean(props.tipo),
+      photoDuration,
     ),
   };
 };
@@ -152,10 +165,33 @@ const KenBurnsPhoto: React.FC<{
   );
 };
 
+type LogoPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+const logoPositionStyle = (position: LogoPosition = "top-left") => {
+  const edge = 80;
+  const style: React.CSSProperties = { position: "absolute" };
+  if (position === "top-left") {
+    style.top = edge;
+    style.left = edge;
+  } else if (position === "top-right") {
+    style.top = edge;
+    style.right = edge;
+  } else if (position === "bottom-left") {
+    style.bottom = edge;
+    style.left = edge;
+  } else {
+    style.bottom = edge;
+    style.right = edge;
+  }
+  return style;
+};
+
 const AgencyWordmark: React.FC<{
   agencyName: string;
   agencyLogoUrl?: string;
-}> = ({ agencyName, agencyLogoUrl }) => {
+  logoPosition?: LogoPosition;
+  logoSize?: number;
+}> = ({ agencyName, agencyLogoUrl, logoPosition = "top-left", logoSize = 64 }) => {
   const frame = useCurrentFrame();
   const opacity = interpolate(frame, [0, 0.4 * FPS], [0, 1], {
     extrapolateLeft: "clamp",
@@ -166,16 +202,14 @@ const AgencyWordmark: React.FC<{
     return (
       <div
         style={{
-          position: "absolute",
-          top: 80,
-          left: 80,
+          ...logoPositionStyle(logoPosition),
           opacity,
           filter: "drop-shadow(0 2px 10px rgba(0,0,0,.45))",
         }}
       >
         <CanvasImage
           src={agencyLogoUrl}
-          style={{ height: 64, width: "auto", objectFit: "contain" }}
+          style={{ height: logoSize, width: "auto", objectFit: "contain" }}
         />
       </div>
     );
@@ -184,9 +218,7 @@ const AgencyWordmark: React.FC<{
   return (
     <div
       style={{
-        position: "absolute",
-        top: 90,
-        left: 80,
+        ...logoPositionStyle(logoPosition),
         fontFamily: sans,
         fontWeight: 700,
         fontSize: 30,
@@ -209,7 +241,18 @@ const CoverSlide: React.FC<{
   price: string;
   agencyName: string;
   agencyLogoUrl?: string;
-}> = ({ photoUrl, address, comune, price, agencyName, agencyLogoUrl }) => {
+  logoPosition?: LogoPosition;
+  logoSize?: number;
+}> = ({
+  photoUrl,
+  address,
+  comune,
+  price,
+  agencyName,
+  agencyLogoUrl,
+  logoPosition,
+  logoSize,
+}) => {
   const frame = useCurrentFrame();
   const opacity = useFadeIn();
 
@@ -222,7 +265,12 @@ const CoverSlide: React.FC<{
             "linear-gradient(180deg, rgba(15,23,42,0) 32%, rgba(15,23,42,.55) 62%, rgba(15,23,42,.97) 100%)",
         }}
       />
-      <AgencyWordmark agencyName={agencyName} agencyLogoUrl={agencyLogoUrl} />
+      <AgencyWordmark
+        agencyName={agencyName}
+        agencyLogoUrl={agencyLogoUrl}
+        logoPosition={logoPosition}
+        logoSize={logoSize}
+      />
       <AbsoluteFill
         style={{
           justifyContent: "flex-end",
@@ -296,13 +344,24 @@ const PhotoSlide: React.FC<{
   index: number;
   agencyName: string;
   agencyLogoUrl?: string;
-}> = ({ photoUrl, index, agencyName, agencyLogoUrl }) => {
+  logoPosition?: LogoPosition;
+  logoSize?: number;
+  durationInFrames?: number;
+}> = ({
+  photoUrl,
+  index,
+  agencyName,
+  agencyLogoUrl,
+  logoPosition,
+  logoSize,
+  durationInFrames = PHOTO_DURATION,
+}) => {
   const opacity = useFadeIn();
   return (
     <AbsoluteFill style={{ backgroundColor: NAVY, opacity }}>
       <KenBurnsPhoto
         src={photoUrl}
-        durationInFrames={PHOTO_DURATION}
+        durationInFrames={durationInFrames}
         index={index}
       />
       <AbsoluteFill
@@ -311,7 +370,12 @@ const PhotoSlide: React.FC<{
             "linear-gradient(180deg, rgba(15,23,42,.45) 0%, rgba(15,23,42,0) 22%, rgba(15,23,42,0) 78%, rgba(15,23,42,.55) 100%)",
         }}
       />
-      <AgencyWordmark agencyName={agencyName} agencyLogoUrl={agencyLogoUrl} />
+      <AgencyWordmark
+        agencyName={agencyName}
+        agencyLogoUrl={agencyLogoUrl}
+        logoPosition={logoPosition}
+        logoSize={logoSize}
+      />
     </AbsoluteFill>
   );
 };
@@ -346,7 +410,15 @@ const OutroSlide: React.FC<{
   phone?: string;
   agentPhotoUrl?: string;
   agencyLogoUrl?: string;
-}> = ({ agencyName, agentName, phone, agentPhotoUrl, agencyLogoUrl }) => {
+  logoSize?: number;
+}> = ({
+  agencyName,
+  agentName,
+  phone,
+  agentPhotoUrl,
+  agencyLogoUrl,
+  logoSize = 52,
+}) => {
   const frame = useCurrentFrame();
   const opacity = useFadeIn();
 
@@ -524,7 +596,7 @@ const OutroSlide: React.FC<{
             <CanvasImage
               src={agencyLogoUrl}
               style={{
-                height: 52,
+                height: logoSize,
                 width: "auto",
                 objectFit: "contain",
                 opacity: badgeOpacity,
@@ -669,7 +741,7 @@ const OutroSlide: React.FC<{
           <CanvasImage
             src={agencyLogoUrl}
             style={{
-              height: 56,
+              height: logoSize + 4,
               width: "auto",
               objectFit: "contain",
               opacity: badgeOpacity,
@@ -725,9 +797,15 @@ export const RealEstateReelMulti: React.FC<Props> = ({
   bagni,
   classeEnergetica,
   musicUrl,
+  logoPosition,
+  logoSize,
+  secondsPerPhoto,
 }) => {
   const { durationInFrames } = useVideoConfig();
   const hasScheda = Boolean(tipo);
+  const photoDuration = secondsPerPhoto
+    ? Math.round(secondsPerPhoto * FPS)
+    : PHOTO_DURATION;
 
   // Ogni slide dopo la prima inizia OVERLAP frame prima che la precedente
   // finisca "nominalmente": essendo dopo nel JSX, si disegna sopra e la
@@ -741,7 +819,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
   const middlePhotos = photos.slice(1);
   const middleSequences = middlePhotos.map((url, i) => {
     const from = cursor - OVERLAP;
-    cursor = from + PHOTO_DURATION;
+    cursor = from + photoDuration;
     return { url, from, index: i + 1 };
   });
 
@@ -763,6 +841,8 @@ export const RealEstateReelMulti: React.FC<Props> = ({
           price={price}
           agencyName={agencyName}
           agencyLogoUrl={agencyLogoUrl}
+          logoPosition={logoPosition}
+          logoSize={logoSize}
         />
       </Sequence>
 
@@ -789,7 +869,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
         <Sequence
           key={index}
           from={from}
-          durationInFrames={PHOTO_DURATION}
+          durationInFrames={photoDuration}
           layout="none"
         >
           <PhotoSlide
@@ -797,6 +877,9 @@ export const RealEstateReelMulti: React.FC<Props> = ({
             index={index}
             agencyName={agencyName}
             agencyLogoUrl={agencyLogoUrl}
+            logoPosition={logoPosition}
+            logoSize={logoSize}
+            durationInFrames={photoDuration}
           />
         </Sequence>
       ))}
@@ -808,6 +891,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
           phone={phone}
           agentPhotoUrl={agentPhotoUrl}
           agencyLogoUrl={agencyLogoUrl}
+          logoSize={logoSize}
         />
       </Sequence>
 
