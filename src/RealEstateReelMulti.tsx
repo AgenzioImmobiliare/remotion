@@ -5,6 +5,7 @@ import {
   CanvasImage,
   Easing,
   Interactive,
+  OffthreadVideo,
   Sequence,
   interpolate,
   staticFile,
@@ -30,7 +31,11 @@ const GOLD = "#D97706";
 const GOLD2 = "#B45309";
 
 export const RealEstateReelMultiSchema = z.object({
-  photos: z.array(z.string()).min(1).max(10),
+  /** Copertina (primo elemento, sempre una foto) + contenuti intermedi: foto
+   * o clip video, in qualunque ordine — una clip si riconosce dall'estensione
+   * del file (.mp4/.mov/.webm/.m4v) e riproduce semplicemente il proprio
+   * video (senza Ken Burns), per secondsPerClip secondi. */
+  photos: z.array(z.string()).min(1).max(14),
   address: z.string(),
   comune: z.string(),
   price: z.string(),
@@ -60,6 +65,8 @@ export const RealEstateReelMultiSchema = z.object({
   logoSize: z.number().optional(),
   /** Durata di ogni foto intermedia, in secondi (default 2.2s). */
   secondsPerPhoto: z.number().optional(),
+  /** Durata di ogni clip video intermedia, in secondi (default 3.5s). */
+  secondsPerClip: z.number().optional(),
 });
 
 type Props = z.infer<typeof RealEstateReelMultiSchema>;
@@ -68,6 +75,7 @@ const FPS = 30;
 export const COVER_DURATION = 3 * FPS;
 export const SCHEDA_DURATION = 5 * FPS;
 export const PHOTO_DURATION = 2.2 * FPS;
+export const CLIP_DURATION = 3.5 * FPS;
 export const OUTRO_DURATION = 3.2 * FPS;
 /** Le slide si sovrappongono di questi frame: la nuova dissolve in entrata
  * SOPRA la precedente (ancora piena), invece di sparire entrambe verso il
@@ -76,18 +84,36 @@ const OVERLAP = Math.round(0.3 * FPS);
 /** Dissolvenza finale a nero, sugli ultimi istanti dell'intero video. */
 const END_FADE = Math.round(0.4 * FPS);
 
-export const durationForPhotoCount = (
-  photoCount: number,
+/** Una clip video si riconosce dall'estensione del file nell'URL, o dal
+ * mime type quando è un data URI (usato nei render da CLI, dove un path
+ * tipo "/clip.mp4" passato via --props risulta 404: si incorpora il file
+ * come base64, che non ha estensione nell'URL). */
+export const isVideoUrl = (url: string) =>
+  /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(url) || /^data:video\//i.test(url);
+
+const middleItemDuration = (
+  url: string,
+  photoDuration: number,
+  clipDuration: number,
+) => (isVideoUrl(url) ? clipDuration : photoDuration);
+
+export const durationForPhotos = (
+  photos: string[],
   hasScheda = false,
   photoDuration = PHOTO_DURATION,
+  clipDuration = CLIP_DURATION,
 ) => {
-  const middleCount = Math.max(0, photoCount - 1);
+  const middle = photos.slice(1);
   const schedaCount = hasScheda ? 1 : 0;
-  const transitions = middleCount + schedaCount + 1; // ogni slide dopo la copertina si sovrappone di OVERLAP
+  const transitions = middle.length + schedaCount + 1; // ogni slide dopo la copertina si sovrappone di OVERLAP
+  const middleTotal = middle.reduce(
+    (sum, url) => sum + middleItemDuration(url, photoDuration, clipDuration),
+    0,
+  );
   return (
     COVER_DURATION +
     schedaCount * SCHEDA_DURATION +
-    middleCount * photoDuration +
+    middleTotal +
     OUTRO_DURATION -
     transitions * OVERLAP
   );
@@ -101,11 +127,15 @@ export const calculateRealEstateReelMultiMetadata = ({
   const photoDuration = props.secondsPerPhoto
     ? Math.round(props.secondsPerPhoto * FPS)
     : PHOTO_DURATION;
+  const clipDuration = props.secondsPerClip
+    ? Math.round(props.secondsPerClip * FPS)
+    : CLIP_DURATION;
   return {
-    durationInFrames: durationForPhotoCount(
-      props.photos.length,
+    durationInFrames: durationForPhotos(
+      props.photos,
       Boolean(props.tipo),
       photoDuration,
+      clipDuration,
     ),
   };
 };
@@ -364,6 +394,43 @@ const PhotoSlide: React.FC<{
         durationInFrames={durationInFrames}
         index={index}
       />
+      <AbsoluteFill
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(15,23,42,.45) 0%, rgba(15,23,42,0) 22%, rgba(15,23,42,0) 78%, rgba(15,23,42,.55) 100%)",
+        }}
+      />
+      <AgencyWordmark
+        agencyName={agencyName}
+        agencyLogoUrl={agencyLogoUrl}
+        logoPosition={logoPosition}
+        logoSize={logoSize}
+      />
+    </AbsoluteFill>
+  );
+};
+
+/** Una clip video al posto di una foto: riproduce semplicemente il proprio
+ * video (muto, niente Ken Burns) per tutta la durata dello slot — essendo
+ * dentro un Sequence di quella durata, se il file è più lungo viene troncato
+ * lì, se è più corto resta fermo sull'ultimo fotogramma fino al cambio slide. */
+const ClipSlide: React.FC<{
+  clipUrl: string;
+  agencyName: string;
+  agencyLogoUrl?: string;
+  logoPosition?: LogoPosition;
+  logoSize?: number;
+}> = ({ clipUrl, agencyName, agencyLogoUrl, logoPosition, logoSize }) => {
+  const opacity = useFadeIn();
+  return (
+    <AbsoluteFill style={{ backgroundColor: NAVY, opacity }}>
+      <AbsoluteFill style={{ overflow: "hidden" }}>
+        <OffthreadVideo
+          src={clipUrl}
+          muted
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      </AbsoluteFill>
       <AbsoluteFill
         style={{
           background:
@@ -800,12 +867,16 @@ export const RealEstateReelMulti: React.FC<Props> = ({
   logoPosition,
   logoSize,
   secondsPerPhoto,
+  secondsPerClip,
 }) => {
   const { durationInFrames } = useVideoConfig();
   const hasScheda = Boolean(tipo);
   const photoDuration = secondsPerPhoto
     ? Math.round(secondsPerPhoto * FPS)
     : PHOTO_DURATION;
+  const clipDuration = secondsPerClip
+    ? Math.round(secondsPerClip * FPS)
+    : CLIP_DURATION;
 
   // Ogni slide dopo la prima inizia OVERLAP frame prima che la precedente
   // finisca "nominalmente": essendo dopo nel JSX, si disegna sopra e la
@@ -818,9 +889,11 @@ export const RealEstateReelMulti: React.FC<Props> = ({
 
   const middlePhotos = photos.slice(1);
   const middleSequences = middlePhotos.map((url, i) => {
+    const video = isVideoUrl(url);
+    const itemDuration = video ? clipDuration : photoDuration;
     const from = cursor - OVERLAP;
-    cursor = from + photoDuration;
-    return { url, from, index: i + 1 };
+    cursor = from + itemDuration;
+    return { url, from, index: i + 1, video, itemDuration };
   });
 
   const outroFrom = cursor - OVERLAP;
@@ -865,22 +938,32 @@ export const RealEstateReelMulti: React.FC<Props> = ({
         </Sequence>
       ) : null}
 
-      {middleSequences.map(({ url, from, index }) => (
+      {middleSequences.map(({ url, from, index, video, itemDuration }) => (
         <Sequence
           key={index}
           from={from}
-          durationInFrames={photoDuration}
+          durationInFrames={itemDuration}
           layout="none"
         >
-          <PhotoSlide
-            photoUrl={url}
-            index={index}
-            agencyName={agencyName}
-            agencyLogoUrl={agencyLogoUrl}
-            logoPosition={logoPosition}
-            logoSize={logoSize}
-            durationInFrames={photoDuration}
-          />
+          {video ? (
+            <ClipSlide
+              clipUrl={url}
+              agencyName={agencyName}
+              agencyLogoUrl={agencyLogoUrl}
+              logoPosition={logoPosition}
+              logoSize={logoSize}
+            />
+          ) : (
+            <PhotoSlide
+              photoUrl={url}
+              index={index}
+              agencyName={agencyName}
+              agencyLogoUrl={agencyLogoUrl}
+              logoPosition={logoPosition}
+              logoSize={logoSize}
+              durationInFrames={itemDuration}
+            />
+          )}
         </Sequence>
       ))}
 

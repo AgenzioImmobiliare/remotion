@@ -101,6 +101,7 @@ export const RemotionRoot: React.FC = () => {
           logoPosition: "top-left",
           logoSize: 64,
           secondsPerPhoto: 2.2,
+          secondsPerClip: 3.5,
         }}
       />
       <Composition
