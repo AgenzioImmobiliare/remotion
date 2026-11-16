@@ -50,6 +50,8 @@ export const RealEstateReelMultiSchema = z.object({
   locali: z.string().optional(),
   bagni: z.string().optional(),
   classeEnergetica: z.string().optional(),
+  /** Musica di sottofondo (loop): se omessa usa music-ambient.mp3. */
+  musicUrl: z.string().optional(),
 });
 
 type Props = z.infer<typeof RealEstateReelMultiSchema>;
@@ -722,6 +724,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
   locali,
   bagni,
   classeEnergetica,
+  musicUrl,
 }) => {
   const { durationInFrames } = useVideoConfig();
   const hasScheda = Boolean(tipo);
@@ -746,7 +749,11 @@ export const RealEstateReelMulti: React.FC<Props> = ({
 
   return (
     <AbsoluteFill name="RealEstateReelMulti" style={{ backgroundColor: NAVY }}>
-      <Audio src={staticFile("music-ambient.mp3")} loop volume={0.35} />
+      <Audio
+        src={musicUrl ?? staticFile("music-ambient.mp3")}
+        loop
+        volume={0.35}
+      />
 
       <Sequence from={coverFrom} durationInFrames={COVER_DURATION} layout="none">
         <CoverSlide
