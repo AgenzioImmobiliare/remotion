@@ -381,6 +381,186 @@ const OutroSlide: React.FC<{
     .join("")
     .toUpperCase();
 
+  const heroY = interpolate(frame, [0, 0.8 * FPS], [40, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
+  });
+  const heroOpacity = interpolate(frame, [0, 0.6 * FPS], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  const phoneBlock = phone ? (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 14,
+        marginTop: 40,
+        padding: "16px 34px",
+        borderRadius: 999,
+        background: "rgba(255,255,255,.08)",
+        border: "1px solid rgba(217,119,6,.5)",
+        opacity: phoneOpacity,
+      }}
+    >
+      <svg
+        width="26"
+        height="26"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={GOLD}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92Z" />
+      </svg>
+      <div
+        style={{
+          fontFamily: sans,
+          fontWeight: 700,
+          fontSize: 36,
+          color: "#fff",
+          letterSpacing: 0.5,
+        }}
+      >
+        {phone}
+      </div>
+    </div>
+  ) : null;
+
+  // Una foto vera dell'agente è quasi sempre un ritaglio a figura intera (sfondo
+  // tolto): schiacciarla nel cerchietto pensato per un primo piano la rendeva
+  // minuscola e irriconoscibile. Con la foto, il layout diventa "a due zone":
+  // testo e contatti a sinistra, agente a figura intera e grande a destra.
+  if (agentPhotoUrl) {
+    return (
+      <AbsoluteFill
+        style={{
+          background: `linear-gradient(180deg, ${NAVY2} 0%, ${NAVY} 55%)`,
+          opacity,
+        }}
+      >
+        <AbsoluteFill
+          style={{
+            alignItems: "flex-end",
+            justifyContent: "flex-end",
+          }}
+        >
+          <div
+            style={{
+              position: "relative",
+              width: 560,
+              height: 1550,
+              flexShrink: 0,
+              opacity: heroOpacity,
+              translate: `0px ${heroY}px`,
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: 260,
+                width: 620,
+                height: 620,
+                marginLeft: -310,
+                borderRadius: "50%",
+                background: `radial-gradient(circle, rgba(217,119,6,.28) 0%, rgba(217,119,6,0) 70%)`,
+              }}
+            />
+            <CanvasImage
+              src={agentPhotoUrl}
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                objectPosition: "bottom",
+              }}
+            />
+          </div>
+        </AbsoluteFill>
+
+        <AbsoluteFill style={{ padding: "150px 0 110px 80px", justifyContent: "flex-start" }}>
+          <div style={{ maxWidth: 470 }}>
+            <Interactive.Div
+              name="Title"
+              style={{
+                fontFamily: serif,
+                fontWeight: 800,
+                fontSize: 68,
+                lineHeight: 1.1,
+                color: "#fff",
+                opacity: titleOpacity,
+              }}
+            >
+              Ti interessa?
+            </Interactive.Div>
+            <Interactive.Div
+              name="Subtitle"
+              style={{
+                fontFamily: sans,
+                fontWeight: 400,
+                fontSize: 30,
+                color: "rgba(255,255,255,.75)",
+                marginTop: 18,
+              }}
+            >
+              Scrivici in DM o prenota una visita
+            </Interactive.Div>
+            {phoneBlock}
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          {agencyLogoUrl ? (
+            <CanvasImage
+              src={agencyLogoUrl}
+              style={{
+                height: 52,
+                width: "auto",
+                objectFit: "contain",
+                opacity: badgeOpacity,
+                marginBottom: 10,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                fontFamily: sans,
+                fontWeight: 700,
+                fontSize: 26,
+                letterSpacing: 1,
+                color: "#fff",
+                textTransform: "uppercase",
+                opacity: badgeOpacity,
+              }}
+            >
+              {agencyName}
+            </div>
+          )}
+          <div
+            style={{
+              fontFamily: sans,
+              fontWeight: 400,
+              fontSize: 22,
+              color: "rgba(255,255,255,.55)",
+              opacity: badgeOpacity,
+              marginTop: 6,
+            }}
+          >
+            {agentName}
+          </div>
+        </AbsoluteFill>
+      </AbsoluteFill>
+    );
+  }
+
   return (
     <AbsoluteFill
       style={{
@@ -415,39 +595,25 @@ const OutroSlide: React.FC<{
           opacity: ringOpacity,
         }}
       >
-        {agentPhotoUrl ? (
-          <CanvasImage
-            src={agentPhotoUrl}
-            style={{
-              width: 150,
-              height: 150,
-              borderRadius: "50%",
-              objectFit: "cover",
-              boxShadow: "0 20px 50px rgba(217,119,6,.4)",
-              scale: ringScale,
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              width: 150,
-              height: 150,
-              borderRadius: "50%",
-              background: `linear-gradient(135deg, ${GOLD}, ${GOLD2})`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 20px 50px rgba(217,119,6,.4)",
-              scale: ringScale,
-              fontFamily: sans,
-              fontWeight: 700,
-              fontSize: 54,
-              color: NAVY,
-            }}
-          >
-            {initials}
-          </div>
-        )}
+        <div
+          style={{
+            width: 150,
+            height: 150,
+            borderRadius: "50%",
+            background: `linear-gradient(135deg, ${GOLD}, ${GOLD2})`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 20px 50px rgba(217,119,6,.4)",
+            scale: ringScale,
+            fontFamily: sans,
+            fontWeight: 700,
+            fontSize: 54,
+            color: NAVY,
+          }}
+        >
+          {initials}
+        </div>
       </AbsoluteFill>
 
       <AbsoluteFill
@@ -487,45 +653,7 @@ const OutroSlide: React.FC<{
           Scrivici in DM o prenota una visita
         </Interactive.Div>
 
-        {phone ? (
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 14,
-              marginTop: 40,
-              padding: "16px 34px",
-              borderRadius: 999,
-              background: "rgba(255,255,255,.08)",
-              border: "1px solid rgba(217,119,6,.5)",
-              opacity: phoneOpacity,
-            }}
-          >
-            <svg
-              width="26"
-              height="26"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke={GOLD}
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92Z" />
-            </svg>
-            <div
-              style={{
-                fontFamily: sans,
-                fontWeight: 700,
-                fontSize: 36,
-                color: "#fff",
-                letterSpacing: 0.5,
-              }}
-            >
-              {phone}
-            </div>
-          </div>
-        ) : null}
+        {phoneBlock}
       </AbsoluteFill>
 
       <AbsoluteFill
