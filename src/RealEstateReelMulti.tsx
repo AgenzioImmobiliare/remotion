@@ -13,6 +13,7 @@ import {
 } from "remotion";
 import { loadFont as loadSerif } from "@remotion/google-fonts/PlayfairDisplay";
 import { loadFont as loadSans } from "@remotion/google-fonts/Inter";
+import { SchedaImmobile } from "./SchedaImmobile";
 
 const { fontFamily: serif } = loadSerif("normal", {
   weights: ["700", "800"],
@@ -40,12 +41,22 @@ export const RealEstateReelMultiSchema = z.object({
   /** PNG trasparente del logo agenzia: se presente sostituisce la scritta
    * testuale "AgencyWordmark" in copertina/foto e nel finale. */
   agencyLogoUrl: z.string().optional(),
+  /** Scheda dati a schermo intero (stile scuro/arancio), inserita subito
+   * dopo la copertina quando "tipo" è presente: comune e price arrivano
+   * dai campi già esistenti qui sopra. */
+  tipo: z.string().optional(),
+  stato: z.string().optional(),
+  mq: z.string().optional(),
+  locali: z.string().optional(),
+  bagni: z.string().optional(),
+  classeEnergetica: z.string().optional(),
 });
 
 type Props = z.infer<typeof RealEstateReelMultiSchema>;
 
 const FPS = 30;
 export const COVER_DURATION = 3 * FPS;
+export const SCHEDA_DURATION = 5 * FPS;
 export const PHOTO_DURATION = 2.2 * FPS;
 export const OUTRO_DURATION = 3.2 * FPS;
 /** Le slide si sovrappongono di questi frame: la nuova dissolve in entrata
@@ -55,11 +66,16 @@ const OVERLAP = Math.round(0.3 * FPS);
 /** Dissolvenza finale a nero, sugli ultimi istanti dell'intero video. */
 const END_FADE = Math.round(0.4 * FPS);
 
-export const durationForPhotoCount = (photoCount: number) => {
+export const durationForPhotoCount = (
+  photoCount: number,
+  hasScheda = false,
+) => {
   const middleCount = Math.max(0, photoCount - 1);
-  const transitions = middleCount + 1; // ogni slide dopo la copertina si sovrappone di OVERLAP
+  const schedaCount = hasScheda ? 1 : 0;
+  const transitions = middleCount + schedaCount + 1; // ogni slide dopo la copertina si sovrappone di OVERLAP
   return (
     COVER_DURATION +
+    schedaCount * SCHEDA_DURATION +
     middleCount * PHOTO_DURATION +
     OUTRO_DURATION -
     transitions * OVERLAP
@@ -72,7 +88,10 @@ export const calculateRealEstateReelMultiMetadata = ({
   props: Props;
 }) => {
   return {
-    durationInFrames: durationForPhotoCount(props.photos.length),
+    durationInFrames: durationForPhotoCount(
+      props.photos.length,
+      Boolean(props.tipo),
+    ),
   };
 };
 
@@ -291,6 +310,30 @@ const PhotoSlide: React.FC<{
         }}
       />
       <AgencyWordmark agencyName={agencyName} agencyLogoUrl={agencyLogoUrl} />
+    </AbsoluteFill>
+  );
+};
+
+/** Avvolge SchedaImmobile con lo stesso fade-in a sovrapposizione delle
+ * altre slide, così si inserisce nel Reel senza stacchi. */
+const SchedaSlide: React.FC<{
+  comune: string;
+  tipo: string;
+  stato: string;
+  price: string;
+  mq?: string;
+  locali?: string;
+  bagni?: string;
+  classeEnergetica?: string;
+}> = (props) => {
+  const opacity = useFadeIn();
+  return (
+    <AbsoluteFill style={{ opacity }}>
+      <SchedaImmobile
+        {...props}
+        durationInFramesOverride={SCHEDA_DURATION}
+        fadeOutAtEnd={false}
+      />
     </AbsoluteFill>
   );
 };
@@ -545,14 +588,24 @@ export const RealEstateReelMulti: React.FC<Props> = ({
   phone,
   agentPhotoUrl,
   agencyLogoUrl,
+  tipo,
+  stato,
+  mq,
+  locali,
+  bagni,
+  classeEnergetica,
 }) => {
   const { durationInFrames } = useVideoConfig();
+  const hasScheda = Boolean(tipo);
 
   // Ogni slide dopo la prima inizia OVERLAP frame prima che la precedente
   // finisca "nominalmente": essendo dopo nel JSX, si disegna sopra e la
   // copre dissolvendo in entrata, un vero crossfade senza mai scendere al nero.
   const coverFrom = 0;
   let cursor = COVER_DURATION;
+
+  const schedaFrom = hasScheda ? cursor - OVERLAP : null;
+  if (hasScheda) cursor = (schedaFrom as number) + SCHEDA_DURATION;
 
   const middlePhotos = photos.slice(1);
   const middleSequences = middlePhotos.map((url, i) => {
@@ -577,6 +630,25 @@ export const RealEstateReelMulti: React.FC<Props> = ({
           agencyLogoUrl={agencyLogoUrl}
         />
       </Sequence>
+
+      {hasScheda ? (
+        <Sequence
+          from={schedaFrom as number}
+          durationInFrames={SCHEDA_DURATION}
+          layout="none"
+        >
+          <SchedaSlide
+            comune={comune}
+            tipo={tipo as string}
+            stato={stato || "In vendita"}
+            price={price}
+            mq={mq}
+            locali={locali}
+            bagni={bagni}
+            classeEnergetica={classeEnergetica}
+          />
+        </Sequence>
+      ) : null}
 
       {middleSequences.map(({ url, from, index }) => (
         <Sequence

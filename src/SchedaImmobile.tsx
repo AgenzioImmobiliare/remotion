@@ -27,6 +27,13 @@ export const SchedaImmobileSchema = z.object({
   bagni: z.string().optional(),
   /** Classe energetica (es. "C"): va messa solo se verificata, mai inventata. */
   classeEnergetica: z.string().optional(),
+  /** Per l'uso incorporato in un Reel più ampio (RealEstateReelMulti): la
+   * durata vera della sequenza che la contiene (diversa da quella della
+   * composizione intera) e se deve dissolvere a nero alla fine (no, se poi
+   * c'è dell'altro a seguire — ci pensa il Reel a farla coprire dalla slide
+   * successiva). Da sola (Composition dedicata) nessuna delle due serve. */
+  durationInFramesOverride: z.number().optional(),
+  fadeOutAtEnd: z.boolean().optional(),
 });
 
 type Props = z.infer<typeof SchedaImmobileSchema>;
@@ -45,9 +52,12 @@ export const SchedaImmobile: React.FC<Props> = ({
   locali,
   bagni,
   classeEnergetica,
+  durationInFramesOverride,
+  fadeOutAtEnd = true,
 }) => {
   const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+  const { durationInFrames: compositionDuration } = useVideoConfig();
+  const durationInFrames = durationInFramesOverride ?? compositionDuration;
 
   const headerOpacity = interpolate(frame, [0, 0.45 * FPS], [0, 1], {
     extrapolateLeft: "clamp",
@@ -305,7 +315,7 @@ export const SchedaImmobile: React.FC<Props> = ({
         </div>
       </AbsoluteFill>
 
-      <EndFade durationInFrames={durationInFrames} />
+      {fadeOutAtEnd ? <EndFade durationInFrames={durationInFrames} /> : null}
     </AbsoluteFill>
   );
 };
