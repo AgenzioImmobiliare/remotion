@@ -72,6 +72,21 @@ export const RealEstateReelMultiSchema = z.object({
   logoSize: z.number().optional(),
   /** Durata di ogni foto intermedia, in secondi (default 2.2s). */
   secondsPerPhoto: z.number().optional(),
+  /** Testo/grafica da mostrare su una foto o clip intermedia specifica — non
+   * tutte devono averne una, e vanno scelte diverse per ciascuna così da non
+   * ripetere le stesse informazioni. "index" è 0-based sugli elementi dopo
+   * la copertina (photos.slice(1)): 0 = il primo elemento dopo la copertina.
+   * kind "location" disegna un'icona a spillo animata + il testo (pensata
+   * per "comune"); kind "label" (default) è solo testo. */
+  clipCallouts: z
+    .array(
+      z.object({
+        index: z.number(),
+        text: z.string(),
+        kind: z.enum(["label", "location"]).optional(),
+      }),
+    )
+    .optional(),
   /** Durata di ogni clip video intermedia, in secondi (default 3.5s). */
   secondsPerClip: z.number().optional(),
 });
@@ -271,6 +286,135 @@ const AgencyWordmark: React.FC<{
   );
 };
 
+/** Spillo di localizzazione (stile "map pin"), usato dal callout kind="location". */
+const PinIcon: React.FC = () => (
+  <svg width="30" height="30" viewBox="0 0 24 24" fill={GOLD} stroke="none">
+    <path d="M12 2C8.14 2 5 5.14 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.86-3.14-7-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
+  </svg>
+);
+
+export type Callout = { text: string; kind?: "label" | "location" };
+
+/** Testo/icona mostrati sopra una foto o clip intermedia, in alto (zona già
+ * scurita dal gradiente), per dare informazioni reali diverse da una slide
+ * all'altra senza ripetere sempre la stessa cosa. "location" aggiunge uno
+ * spillo animato (cade dall'alto con un rimbalzo) e un anello che pulsa
+ * piano sotto di esso — pensato per mostrare il comune dove si trova
+ * l'immobile. "label" è solo testo, con un ingresso più sobrio. */
+const CalloutBadge: React.FC<{ callout: Callout }> = ({ callout }) => {
+  const { text, kind = "label" } = callout;
+  const frame = useCurrentFrame();
+
+  if (kind === "location") {
+    const bounceIn = interpolate(frame, [0, 0.7 * FPS], [-60, 0], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.bezier(0.34, 1.56, 0.64, 1),
+    });
+    const opacity = interpolate(frame, [0, 0.3 * FPS], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    // Anello che pulsa con un ciclo continuo (loop via modulo sul frame),
+    // sotto lo spillo — un piccolo "ping" di localizzazione.
+    const cycle = 1.6 * FPS;
+    const t = frame % cycle;
+    const ringScale = interpolate(t, [0, cycle], [0.5, 1.6], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    const ringOpacity =
+      interpolate(t, [0, cycle], [0.5, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) *
+      opacity;
+
+    return (
+      <div
+        style={{
+          position: "absolute",
+          top: 190,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: 12,
+          opacity,
+          translate: `0px ${bounceIn}px`,
+        }}
+      >
+        <div style={{ position: "relative", width: 30, height: 30 }}>
+          <div
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              width: 30,
+              height: 30,
+              marginLeft: -15,
+              marginTop: -15,
+              borderRadius: "50%",
+              border: `2px solid ${GOLD}`,
+              opacity: ringOpacity,
+              scale: ringScale,
+            }}
+          />
+          <PinIcon />
+        </div>
+        <div
+          style={{
+            fontFamily: serif,
+            fontWeight: 800,
+            fontSize: 42,
+            color: "#fff",
+            textShadow: "0 2px 12px rgba(0,0,0,.5)",
+          }}
+        >
+          {text}
+        </div>
+      </div>
+    );
+  }
+
+  const slideY = interpolate(frame, [0, 0.4 * FPS], [16, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
+  });
+  const opacity = interpolate(frame, [0, 0.35 * FPS], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 190,
+        left: 0,
+        right: 0,
+        display: "flex",
+        justifyContent: "center",
+        opacity,
+        translate: `0px ${slideY}px`,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: sans,
+          fontWeight: 700,
+          fontSize: 38,
+          color: "#fff",
+          textShadow: "0 2px 12px rgba(0,0,0,.5)",
+          textAlign: "center",
+          padding: "0 90px",
+        }}
+      >
+        {text}
+      </div>
+    </div>
+  );
+};
+
 const CoverSlide: React.FC<{
   photoUrl: string;
   address: string;
@@ -384,6 +528,7 @@ const PhotoSlide: React.FC<{
   logoPosition?: LogoPosition;
   logoSize?: number;
   durationInFrames?: number;
+  callout?: Callout;
 }> = ({
   photoUrl,
   index,
@@ -392,6 +537,7 @@ const PhotoSlide: React.FC<{
   logoPosition,
   logoSize,
   durationInFrames = PHOTO_DURATION,
+  callout,
 }) => {
   const opacity = useFadeIn();
   return (
@@ -407,6 +553,7 @@ const PhotoSlide: React.FC<{
             "linear-gradient(180deg, rgba(15,23,42,.45) 0%, rgba(15,23,42,0) 22%, rgba(15,23,42,0) 78%, rgba(15,23,42,.55) 100%)",
         }}
       />
+      {callout ? <CalloutBadge callout={callout} /> : null}
       <AgencyWordmark
         agencyName={agencyName}
         agencyLogoUrl={agencyLogoUrl}
@@ -429,6 +576,7 @@ const ClipSlide: React.FC<{
   logoSize?: number;
   index: number;
   durationInFrames: number;
+  callout?: Callout;
 }> = ({
   clipUrl,
   agencyName,
@@ -437,6 +585,7 @@ const ClipSlide: React.FC<{
   logoSize,
   index,
   durationInFrames,
+  callout,
 }) => {
   const frame = useCurrentFrame();
   const opacity = useFadeIn();
@@ -492,6 +641,7 @@ const ClipSlide: React.FC<{
           background: `linear-gradient(90deg, ${GOLD}, ${GOLD2})`,
         }}
       />
+      {callout ? <CalloutBadge callout={callout} /> : null}
       <AgencyWordmark
         agencyName={agencyName}
         agencyLogoUrl={agencyLogoUrl}
@@ -1006,6 +1156,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
   logoSize,
   secondsPerPhoto,
   secondsPerClip,
+  clipCallouts,
 }) => {
   const { durationInFrames } = useVideoConfig();
   const hasScheda = Boolean(tipo);
@@ -1025,13 +1176,17 @@ export const RealEstateReelMulti: React.FC<Props> = ({
   const schedaFrom = hasScheda ? cursor - OVERLAP : null;
   if (hasScheda) cursor = (schedaFrom as number) + SCHEDA_DURATION;
 
+  const calloutByIndex = new Map<number, Callout>(
+    (clipCallouts ?? []).map((c) => [c.index, { text: c.text, kind: c.kind }]),
+  );
+
   const middlePhotos = photos.slice(1);
   const middleSequences = middlePhotos.map((url, i) => {
     const video = isVideoUrl(url);
     const itemDuration = video ? clipDuration : photoDuration;
     const from = cursor - OVERLAP;
     cursor = from + itemDuration;
-    return { url, from, index: i + 1, video, itemDuration };
+    return { url, from, index: i + 1, video, itemDuration, callout: calloutByIndex.get(i) };
   });
 
   const outroFrom = cursor - OVERLAP;
@@ -1076,7 +1231,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
         </Sequence>
       ) : null}
 
-      {middleSequences.map(({ url, from, index, video, itemDuration }) => (
+      {middleSequences.map(({ url, from, index, video, itemDuration, callout }) => (
         <Sequence
           key={index}
           from={from}
@@ -1092,6 +1247,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
               logoSize={logoSize}
               index={index}
               durationInFrames={itemDuration}
+              callout={callout}
             />
           ) : (
             <PhotoSlide
@@ -1102,6 +1258,7 @@ export const RealEstateReelMulti: React.FC<Props> = ({
               logoPosition={logoPosition}
               logoSize={logoSize}
               durationInFrames={itemDuration}
+              callout={callout}
             />
           )}
         </Sequence>

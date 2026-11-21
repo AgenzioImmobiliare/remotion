@@ -26,10 +26,20 @@ Struttura del Reel (in quest'ordine):
    prezzo — fa da "miniatura" tipo YouTube.
 2. **Clip video in sequenza** (`ClipSlide`): le clip che manda, nell'ordine in
    cui le manda (o nell'ordine che specifica lui per nome file). Ogni clip ha
-   *solo* il logo agenzia in overlay — **mai** testo/prezzo/contatti ripetuti
-   su ogni clip. Le clip hanno già di default: zoom lento continuo (alternato
-   per indice) + una linea d'accento dorata animata, come motion graphic
-   leggero.
+   di default: zoom lento continuo (alternato per indice) + una linea
+   d'accento dorata animata (motion graphic leggero, sempre presente).
+   In più, su **alcune** clip (non tutte, e mai la stessa cosa due volte) si
+   può aggiungere un callout reale via `clipCallouts` (array di
+   `{ index, text, kind }`, `index` 0-based sulle clip/foto dopo la
+   copertina):
+   - `kind: "location"` → spillo animato (cade con un rimbalzo + anello che
+     pulsa) col nome del comune. Da usare su **una sola** clip, preferibilmente
+     una ripresa esterna/d'insieme — è il modo per mostrare "dove si trova"
+     chiesto esplicitamente da Enzo.
+   - `kind: "label"` (default) → solo testo, per un dato reale diverso per
+     ogni clip (es. "Interni ristrutturati", "Climatizzato", "Vista sul
+     borgo"). Mai lo stesso identico testo su più clip, mai dati inventati.
+   Una clip può anche non avere nessun callout: non è obbligatorio su tutte.
 3. **Scheda dati** (`tipo`/`stato`/`mq`/`locali`/`bagni`/`classeEnergetica`),
    una sola volta — solo i campi che si conoscono per davvero, mai inventati:
    se manca un dato si omette quella card.
