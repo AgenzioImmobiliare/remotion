@@ -41,7 +41,14 @@ export const RealEstateReelMultiSchema = z.object({
   price: z.string(),
   agencyName: z.string(),
   agentName: z.string(),
+  /** Es. "Consulente immobiliare": mostrato sotto il nome nel finale. */
+  agentRole: z.string().optional(),
   phone: z.string().optional(),
+  email: z.string().optional(),
+  /** Testo da mostrare per Instagram, es. "lecasedallaaalloz.io" (senza @ o URL). */
+  instagramHandle: z.string().optional(),
+  /** Nome pagina Facebook da mostrare, es. "Immobiliare.Agropoli". */
+  facebookPage: z.string().optional(),
   agentPhotoUrl: z.string().optional(),
   /** PNG trasparente del logo agenzia: se presente sostituisce la scritta
    * testuale "AgencyWordmark" in copertina/foto e nel finale. */
@@ -76,7 +83,7 @@ export const COVER_DURATION = 3 * FPS;
 export const SCHEDA_DURATION = 5 * FPS;
 export const PHOTO_DURATION = 2.2 * FPS;
 export const CLIP_DURATION = 3.5 * FPS;
-export const OUTRO_DURATION = 3.2 * FPS;
+export const OUTRO_DURATION = 4.8 * FPS;
 /** Le slide si sovrappongono di questi frame: la nuova dissolve in entrata
  * SOPRA la precedente (ancora piena), invece di sparire entrambe verso il
  * nero nello stesso istante. Un vero crossfade, non due dissolvenze separate. */
@@ -420,21 +427,69 @@ const ClipSlide: React.FC<{
   agencyLogoUrl?: string;
   logoPosition?: LogoPosition;
   logoSize?: number;
-}> = ({ clipUrl, agencyName, agencyLogoUrl, logoPosition, logoSize }) => {
+  index: number;
+  durationInFrames: number;
+}> = ({
+  clipUrl,
+  agencyName,
+  agencyLogoUrl,
+  logoPosition,
+  logoSize,
+  index,
+  durationInFrames,
+}) => {
+  const frame = useCurrentFrame();
   const opacity = useFadeIn();
+
+  // Stessa idea del Ken Burns sulle foto, applicata al video: uno zoom lento
+  // e continuo (mai una clip perfettamente ferma), direzione alternata per
+  // indice così due clip di fila non si muovono allo stesso modo.
+  const zoomIn = index % 2 === 0;
+  const scale = interpolate(
+    frame,
+    [0, durationInFrames],
+    zoomIn ? [1, 1.08] : [1.08, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.linear },
+  );
+
+  // Linea d'accento che entra da sinistra sopra il video, un piccolo tocco di
+  // motion graphic oltre al solo watermark — non un testo, così non ripete
+  // informazioni tra una clip e l'altra.
+  const accentWidth = interpolate(frame, [0, 0.6 * FPS], [0, 140], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.bezier(0.16, 1, 0.3, 1),
+  });
+
   return (
     <AbsoluteFill style={{ backgroundColor: NAVY, opacity }}>
       <AbsoluteFill style={{ overflow: "hidden" }}>
         <OffthreadVideo
           src={clipUrl}
           muted
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            scale,
+          }}
         />
       </AbsoluteFill>
       <AbsoluteFill
         style={{
           background:
             "linear-gradient(180deg, rgba(15,23,42,.45) 0%, rgba(15,23,42,0) 22%, rgba(15,23,42,0) 78%, rgba(15,23,42,.55) 100%)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          left: 80,
+          bottom: 70,
+          width: accentWidth,
+          height: 6,
+          borderRadius: 3,
+          background: `linear-gradient(90deg, ${GOLD}, ${GOLD2})`,
         }}
       />
       <AgencyWordmark
@@ -471,17 +526,126 @@ const SchedaSlide: React.FC<{
   );
 };
 
+/** Icone minime (stroke oro) per i contatti nel finale — stesso tratto dello
+ * SVG telefono già in uso, solo altri path. */
+const ContactIcon: React.FC<{ kind: "phone" | "mail" | "instagram" | "facebook" }> = ({
+  kind,
+}) => {
+  const common = {
+    width: 26,
+    height: 26,
+    viewBox: "0 0 24 24",
+    fill: "none" as const,
+    stroke: GOLD,
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  if (kind === "phone") {
+    return (
+      <svg {...common}>
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92Z" />
+      </svg>
+    );
+  }
+  if (kind === "mail") {
+    return (
+      <svg {...common}>
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2Z M2 6l10 7 10-7" />
+      </svg>
+    );
+  }
+  if (kind === "instagram") {
+    return (
+      <svg {...common}>
+        <rect x="2" y="2" width="20" height="20" rx="5" />
+        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37Z" />
+        <path d="M17.5 6.5h.01" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3Z" />
+    </svg>
+  );
+};
+
+/** Riga di contatti: telefono, email, Instagram, Facebook — solo quelli dati
+ * (mai inventati), impilati e con entrata leggermente scaglionata. */
+const ContactStack: React.FC<{
+  phone?: string;
+  email?: string;
+  instagramHandle?: string;
+  facebookPage?: string;
+  baseOpacity: number;
+  frame: number;
+}> = ({ phone, email, instagramHandle, facebookPage, baseOpacity, frame }) => {
+  const rows: { kind: "phone" | "mail" | "instagram" | "facebook"; text: string }[] = [
+    phone ? { kind: "phone", text: phone } : null,
+    email ? { kind: "mail", text: email } : null,
+    instagramHandle ? { kind: "instagram", text: instagramHandle } : null,
+    facebookPage ? { kind: "facebook", text: facebookPage } : null,
+  ].filter((r): r is { kind: "phone" | "mail" | "instagram" | "facebook"; text: string } => r !== null);
+
+  if (!rows.length) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 36 }}>
+      {rows.map((r, i) => {
+        const rowOpacity =
+          baseOpacity *
+          interpolate(frame, [1.7 * FPS + i * 0.2 * FPS, 2.1 * FPS + i * 0.2 * FPS], [0, 1], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          });
+        return (
+          <div
+            key={r.kind}
+            style={{ display: "flex", alignItems: "center", gap: 14, opacity: rowOpacity }}
+          >
+            <div style={{ flexShrink: 0 }}>
+              <ContactIcon kind={r.kind} />
+            </div>
+            <div
+              style={{
+                fontFamily: sans,
+                fontWeight: 600,
+                fontSize: 28,
+                color: "#fff",
+                letterSpacing: 0.2,
+                overflowWrap: "anywhere",
+                minWidth: 0,
+              }}
+            >
+              {r.text}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const OutroSlide: React.FC<{
   agencyName: string;
   agentName: string;
+  agentRole?: string;
   phone?: string;
+  email?: string;
+  instagramHandle?: string;
+  facebookPage?: string;
   agentPhotoUrl?: string;
   agencyLogoUrl?: string;
   logoSize?: number;
 }> = ({
   agencyName,
   agentName,
+  agentRole,
   phone,
+  email,
+  instagramHandle,
+  facebookPage,
   agentPhotoUrl,
   agencyLogoUrl,
   logoSize = 52,
@@ -508,12 +672,6 @@ const OutroSlide: React.FC<{
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const phoneOpacity = interpolate(frame, [1.7 * FPS, 2.2 * FPS], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.spring({ damping: 14 }),
-  });
-
   const initials = agentName
     .split(/\s+/)
     .map((w) => w[0])
@@ -531,46 +689,6 @@ const OutroSlide: React.FC<{
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-
-  const phoneBlock = phone ? (
-    <div
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 14,
-        marginTop: 40,
-        padding: "16px 34px",
-        borderRadius: 999,
-        background: "rgba(255,255,255,.08)",
-        border: "1px solid rgba(217,119,6,.5)",
-        opacity: phoneOpacity,
-      }}
-    >
-      <svg
-        width="26"
-        height="26"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke={GOLD}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92Z" />
-      </svg>
-      <div
-        style={{
-          fontFamily: sans,
-          fontWeight: 700,
-          fontSize: 36,
-          color: "#fff",
-          letterSpacing: 0.5,
-        }}
-      >
-        {phone}
-      </div>
-    </div>
-  ) : null;
 
   // Una foto vera dell'agente è quasi sempre un ritaglio a figura intera (sfondo
   // tolto): schiacciarla nel cerchietto pensato per un primo piano la rendeva
@@ -654,7 +772,14 @@ const OutroSlide: React.FC<{
             >
               Scrivici in DM o prenota una visita
             </Interactive.Div>
-            {phoneBlock}
+            <ContactStack
+              phone={phone}
+              email={email}
+              instagramHandle={instagramHandle}
+              facebookPage={facebookPage}
+              baseOpacity={1}
+              frame={frame}
+            />
           </div>
 
           <div style={{ flex: 1 }} />
@@ -696,6 +821,7 @@ const OutroSlide: React.FC<{
             }}
           >
             {agentName}
+            {agentRole ? ` · ${agentRole}` : ""}
           </div>
         </AbsoluteFill>
       </AbsoluteFill>
@@ -794,7 +920,14 @@ const OutroSlide: React.FC<{
           Scrivici in DM o prenota una visita
         </Interactive.Div>
 
-        {phoneBlock}
+        <ContactStack
+          phone={phone}
+          email={email}
+          instagramHandle={instagramHandle}
+          facebookPage={facebookPage}
+          baseOpacity={1}
+          frame={frame}
+        />
       </AbsoluteFill>
 
       <AbsoluteFill
@@ -841,6 +974,7 @@ const OutroSlide: React.FC<{
           }}
         >
           {agentName}
+          {agentRole ? ` · ${agentRole}` : ""}
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
@@ -854,7 +988,11 @@ export const RealEstateReelMulti: React.FC<Props> = ({
   price,
   agencyName,
   agentName,
+  agentRole,
   phone,
+  email,
+  instagramHandle,
+  facebookPage,
   agentPhotoUrl,
   agencyLogoUrl,
   tipo,
@@ -952,6 +1090,8 @@ export const RealEstateReelMulti: React.FC<Props> = ({
               agencyLogoUrl={agencyLogoUrl}
               logoPosition={logoPosition}
               logoSize={logoSize}
+              index={index}
+              durationInFrames={itemDuration}
             />
           ) : (
             <PhotoSlide
@@ -971,7 +1111,11 @@ export const RealEstateReelMulti: React.FC<Props> = ({
         <OutroSlide
           agencyName={agencyName}
           agentName={agentName}
+          agentRole={agentRole}
           phone={phone}
+          email={email}
+          instagramHandle={instagramHandle}
+          facebookPage={facebookPage}
           agentPhotoUrl={agentPhotoUrl}
           agencyLogoUrl={agencyLogoUrl}
           logoSize={logoSize}
